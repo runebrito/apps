@@ -1,0 +1,17 @@
+1. Copiar el contenido de la carpeta "RB_CRUD" al directorio XAMPP/htdocs/
+
+2. En Phpmyadmin crear la base de datos "empleados" e importar el archivo "empleados.sql" ubicado en la carpeta "RB_MySql"
+
+3. Una vez instalado para ejecutarlosolo hay que teclear en la barra del navegador http://localhost/RB_CRUD/index.php
+
+Luego se puede acceder como administrador ó como empleado con las siguientes contraseñas: 
+
+Como administrador
+Usuario: admin
+Contraseña: admin
+
+Y Como empleado:
+Usuario: arqrune@gmail.com
+Contraseña : admin
+
+
