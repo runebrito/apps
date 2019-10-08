@@ -1,6 +1,6 @@
 # Screenshots
-![](docs/screenshot1.png)
-![](docs/screenshot2.png)
+![](Docs/screenshot1.png)
+![](Docs/screenshot2.png)
 
 # Improvements for the Future
 
