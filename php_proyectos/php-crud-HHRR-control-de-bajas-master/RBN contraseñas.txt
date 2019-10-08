@@ -1,7 +1,0 @@
-USUARIO / Empleado
-Email id : arqrune@gmail.com
-Contraseña : admin
-
-ADMINISTRADOR
-Email id : admin
-Contraseña: admin
