@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+
+  <head>
+    <title>Rope up</title>
+    <style>
+      body{
+        margin:0;
+      }
+      #canvas{
+        background-color: #000000;
+      }
+    </style>
+  </head>
+<body>
+<canvas id='canvas'></canvas> <!--Donde todo aparece! -->
+<script>
+var canvas = document.querySelector('canvas');
+function scaleCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+scaleCanvas();
+var ctx = canvas.getContext('2d');
+ctx.font = '28px Verdana';
+ctx.fillStyle='#ffa801';
+var holdtime; //Cuanto tiempo se sostiene
+var starttime; //Cuando la ronda empieza
+var best = 0; //el mejor tiempo hasta ahora.
+
+//Puntos a lo largo de la cuerda. 
+function Point(x,y){
+  this.x = x;
+  this.y = y;
+  this.targetX = this.x;
+  this.prevX = this.x;
+
+  //Actualiza los puntos a lo largo de la línea o cuerda. TargetX se establece en la función de animación / a continuación.
+  this.update = function(){
+    if(this.x < this.targetX){
+      this.x += (this.targetX-this.x)/4; //Mueve 1/4 del camino al objetivo.
+    } else if(this.x > this.targetX){
+      this.x -= (this.x-this.targetX)/4; //Mueve 1/4 del camino al objetivo, excepto el negativo.
+    }
+  }
+}
+
+//Obstáculos que caen para hacer caer al jugador.
+function Obstacle(x,y, radius){
+  this.x = x;
+  this.y = y;
+  this.radius= radius;
+
+  this.draw = function(){
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, 2*Math.PI);
+    ctx.fill();
+    ctx.closePath();
+    //La verificación de la distancia se utiliza para determinar la colisión, ver 'getDistance' a continuación
+    var collisionDistance = getDistance(player.x, player.y+80, this.x, this.y);
+    if(collisionDistance < player.radius+this.radius){ //Usando el radio de ambos cuerpos simula la colisión en el borde exterior de los círculos
+      //Cuando se piede -> 
+      fail = true;
+    }
+  }
+
+  this.update = function(){
+    this.y += 8+(this.radius/10); //Deja caer el obstáculo a una velocidad constante, ligeramente afectado por su masa
+    this.draw();
+  }
+}
+
+
+function Player(x,y,radius){
+  this.x = x;
+  this.y = y;
+  this.radius = radius;
+  this.nearestPoint = undefined;
+  this.wave = 0.0;
+  this.flipped = false;
+  this.arms = false;
+  this.moveDelta = 0;
+  this.failTimer = new Date();
+  
+  this.draw = function(){
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    //Obliga al jugador a caer después de fallar.
+    if(fail){
+      this.y += this.radius;
+    }
+    //(Flipped) y (wave) son para agitar la animación de los brazos cuando se separan de la línea.
+    //Aquí solo estamos haciendo un rebote simple para usar en una llamada Math.sin () posterior.
+    if(this.wave > 1.0){
+      this.flipped = true;
+    } else if(this.wave < -1.0){
+      this.flipped = false;
+    }
+    if(!this.flipped){
+      this.wave+= 0.5;
+    } else {
+      this.wave -= 0.5;
+    }
+    if(this.nearestPoint != undefined){ //Aqui se asegura que tengamos un punto cercano
+    //BRAZOS -----
+      ctx.strokeStyle='#FF6C09';
+      //Mientras se sostiene, dibuja los brazos al punto más cercano en la línea o cuerda.
+      if(Math.abs(this.nearestPoint.x-this.x) < 50 && !fail){
+        ctx.beginPath();
+        ctx.moveTo(this.nearestPoint.x, this.nearestPoint.y);
+        ctx.lineTo(this.x-(this.radius*0.7), this.y+50);
+        ctx.moveTo(this.x+(this.radius*0.5), this.y+50);
+        ctx.lineTo(this.nearestPoint.x, this.nearestPoint.y);
+
+        ctx.stroke();
+
+        this.arms = false; //Los brazos no están agitándose
+        this.failTimer = 0; //Mientras está agarrado a la línea, reinicia el temporizador de fallo.
+        holdtime = Math.floor((new Date()-starttime)/10)/100; //actualiza el tiempo de espera con algún formato.
+        ctx.fillStyle='#FF6C09';
+        ctx.font = "48pt Helvetica";
+        ctx.fillText(holdtime+"s",20,70); //Muestra el tiempo de espera al jugador mientras está agarrado
+      } else { //Ondulacion de la cuerda o linea
+        ctx.beginPath();
+        ctx.moveTo(this.x-(this.radius/2), this.y+50);
+        ctx.lineTo(this.x-(this.radius+30), (this.y+50)+(Math.sin(this.wave)*15));
+        ctx.moveTo(this.x+(this.radius/2), this.y+50);
+        ctx.lineTo(this.x+(this.radius+30), (this.y+50)+(Math.sin(this.wave)*15));
+        ctx.stroke();
+        this.arms = true; //Brazos no estan aferrados a la cuerda o linea
+
+        //Inicia el failtimer o tiempo de falla, (si no lo hemos hecho ya).
+        if(this.failTimer == 0){
+          this.failTimer = new Date(); 
+        }
+
+      }
+      
+    //CABEZA
+      ctx.beginPath();
+      //Dibuja la cabeza inclinada hacia la cuerda para obtener realismo, pero solo si el jugador se mantiene
+      if(this.nearestPoint.x < this.x-20 && !this.arms){ //Dibuja e inclina la cabeza hacia la derecha
+        ctx.arc(this.x-7, this.y-this.radius+50,this.radius*0.7,0,2*Math.PI);
+      } else if(this.nearestPoint.x > this.x+20 && !this.arms){ //Dibuja e inclina la cabeza hacia la izq.
+        ctx.arc(this.x+7, this.y-this.radius+50,this.radius*0.7,0,2*Math.PI);
+      } else {
+        ctx.arc(this.x,this.y-this.radius+50,this.radius*0.7,0,2*Math.PI);
+      }
+
+      ctx.fillStyle='#FF6C09';
+      ctx.fill();
+      ctx.closePath();
+      
+    //PIERNAS
+      //Las piernas usan 'moveDelta' para seguir el cuerpo, lo que causa un retraso en el movimiento y agrega realismo.
+      ctx.beginPath();
+      ctx.moveTo((this.x+this.moveDelta)-10,this.y+85);
+      ctx.lineTo(this.x-10,this.y+55);
+      ctx.lineTo(this.x+10,this.y+55);
+      ctx.lineTo((this.x+this.moveDelta)+10,this.y+85);
+      ctx.stroke();
+      ctx.closePath();
+
+      //Actualiza el moveDelta para interpolar las piernas.
+      if(this.moveDelta < 0.0){
+        this.moveDelta += Math.abs(this.moveDelta)/4;
+      } else if(this.moveDelta > 0.0){
+        this.moveDelta -= this.moveDelta/4;
+      }
+
+    //CUERPO
+      //Nada de lujos, aquí solo es un círculo con un desplazamiento vertical.
+      ctx.beginPath();
+      ctx.arc(this.x, this.y+55, this.radius, 0, 2 * Math.PI);
+      ctx.fillStyle = '#FF6C09';
+      ctx.strokeStyle = '#FF6C09';
+      ctx.fill();
+      ctx.stroke();
+      ctx.closePath();
+    }
+    
+    //Si se suelta de la cuerda por mas de "1000 milisegundos", pierdes. 
+    if(this.failTimer > 0 && !fail){
+      if(new Date() - this.failTimer > 1000){
+        fail = true;
+      } 
+    }
+  } 
+} 
+
+var pointCount = 30; //Calidad de la linea (cuerda) y densidad de la misma 
+var dist = innerHeight/(pointCount-1); //Distancia entre los puntos de la linea
+var pointArray=[]; //controla y mantiene los puntos sobre la linea o cuerda
+var interval = 0; //Interval, limit, y steps; se utilizan para aumentar el movimiento de líneas.
+var limit = 60;
+var steps = 0;
+var difficulty = innerWidth/6; //Establece un límite de movimiento para la línea.
+
+//Establece un límite de movimiento para la línea.
+for(var i = 0; i < pointCount; i++){
+  pointArray.push(new Point(innerWidth/2, i*dist));
+}
+
+//Variables del estado del juego
+var fail = false; 
+var start = false;
+
+//Construccion del jugador
+var player = new Player(innerWidth/2, innerHeight/2, 15);
+var obstacles = [];//Obstaculos a esquivar
+var increase = false; //Aumento para mas obstaculos 
+
+player.nearestPoint = pointArray[Math.ceil(pointArray.length/2)-3]; //Establezca el punto más cercano predeterminado.
+
+//Basicamente el loop del juego
+function animate(){
+  window.requestAnimationFrame(animate); //Esta es la línea principal que hace que el bucle se repita.
+  ctx.clearRect(0,0,innerWidth,innerHeight); //Borra todo el canvas de cada fotograma. 
+
+  interval++; //Aqui comienza la proyecion de la linea oscilante
+  //DIBUJO DE LA LINEA O CUERDA
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  for(var p = 0; p < pointArray.length; p++){ //Loop o bucle por los puntos
+    if(p == 0){ //El primer punto es el punto en movimiento, el resto solo sigue.
+      ctx.strokeStyle='#2c3e50'; //Color de la cuerda
+      ctx.moveTo(pointArray[p].x,pointArray[p].y);
+      if(!fail){ 
+        if(interval >= limit){ //Hemos llegado al intervalo, hora de cambiar el primer punto.
+          pointArray[p].targetX = ((Math.random()-0.5)*difficulty)+innerWidth/2; 
+          difficulty+= 10; //Incremento de la Dificultad 
+          if(difficulty > innerWidth/2){ // (No superes los límites del lienzo o canvas).
+            difficulty = innerWidth/2; 
+          }
+          interval = 0; //Borra el intervalo para la oscilacion 
+          steps++; //Sigue los pasos (tambien conocido como "shift count")
+          if(steps >= 30){ //Si llegamos a un numero de pasos
+            limit -= 5; //Disminuye el tiempo entre turnos.
+            if(limit < 10){ // no reducirlo a cero
+              limit = 10;
+            }
+            steps = 0; //Reestablece los pasos para un nuevo ciclo
+          }
+        }
+      } else { //Al perder, muestra la puntuación, y proporciona alguna dirección.
+        ctx.font = "48pt Helvetica";
+        ctx.fillText(holdtime+"s",20,70);
+        ctx.font = "14pt Helvetica";
+        ctx.fillText('Click para empezar',20,95);
+      }
+    } else { //Cada punto siguiente después del primero
+      ctx.lineTo(pointArray[p].x, pointArray[p].y);
+      if(!fail){ //Establezca el objetivo de este punto con respecto a la posición del punto anterior.
+        pointArray[p].targetX = pointArray[p-1].x;
+      }
+    }
+    pointArray[p].update(); //Restablecimiento de los puntos para el proximo bucle o loop 
+  }
+  ctx.stroke(); //FINALMENTE SE DIBUJA LA LINEA O CUERDA
+
+  player.draw(); //Dibujo entero del personaje o jugador (muy simple).
+  start = true; //Comienza el juego, (si no lo hemos hecho ya).
+
+  //REPRODUCCION DE OBTACULOS A TRAVES DE LA SOGA
+  if(holdtime > 8){ //No genera ningún obstáculo durante los primeros 12 segundos. Deja que el jugador se acostumbre a la línea de meneo.
+    if(Math.floor(holdtime) % 10 == 0 && !increase){ 
+    //Crea un nuevo obstáculo cada 10 segundos, de indole lineal.
+      obstacles.push(new Obstacle(player.x + (Math.random()-0.5), -50, Math.random() * 30+10));
+      increase = true; //activa la creación para que no crear obstáculos infinitos.
+    }
+    //Asegura que se desactiva la alternancia de creación, para que podamos hacer más obstáculos.
+    if(Math.floor(holdtime) % 10 != 0){
+      increase = false;
+    }
+    //Recorre y actualiza / dibuja todos los obstáculos. (loop)
+    for(var o = 0; o < obstacles.length;o++){
+      obstacles[o].update();
+      //Si el obstáculo cae fuera de la pantalla (que lo hará), entonces se regenerará en la parte superior
+      // TEMPORIZADOR
+      if(obstacles[o].y > innerHeight + obstacles[o].radius+10 && !fail){
+        obstacles[o] = new Obstacle(player.x + (Math.random()-0.5), -50, Math.random() * 30+10);
+      }
+    }
+
+  }
+
+  //Muestra el mejor tiempo / y el titulo del juego.
+  ctx.font = "12pt Helvetica";
+  ctx.fillStyle='#2c3e50';
+  if(best > 0){
+    var time = best;
+    if(holdtime > best){
+      time = holdtime;
+    }
+    ctx.fillText('RECORD:'+time,20,20);
+  } else {
+    ctx.fillText('ROPE-UP // BY RBN',20,20);
+  }
+} //FIN de la funcion animate
+
+
+var prevMouseX = innerWidth/2;
+// Movimiento del mouse y determina el punto de línea más cercano
+window.addEventListener('mousemove', function(e){
+  if(!fail){
+    player.x = e.pageX;
+    player.y = e.pageY;
+    //Obtener el punto más cercano a través de pointArray
+    var nearestPoint = undefined;
+    var ny = 10000; 
+    for(var i = 0; i < pointArray.length; i++){
+      //Consigue el punto más cercano en la Cuerda.
+      if(Math.abs(pointArray[i].y-player.y) < ny){
+        ny = Math.abs(pointArray[i].y-player.y);
+        nearestPoint = pointArray[i];
+      }
+      //Se asigna el punto más cercano solo si está fuera del rango de giro.
+    }
+    if(nearestPoint != undefined){
+      player.nearestPoint = nearestPoint;
+    }
+
+    //Actualiza el jugador moveDelta para hacer "refresh" a las piernas.
+    player.moveDelta -= player.x-prevMouseX;
+
+    //Set previous to current.
+    prevMouseX = player.x;
+  } 
+});
+
+window.addEventListener('mousedown', function(e){ //Cuando el jugador cliclea
+  if(fail){ //Ya hemos fallado, así que vamos a reiniciar el juego.. 
+    if(holdtime > best){
+      updateScore(holdtime); //Actualiza nuestra mejor puntuación si es aplicable.
+    }
+
+    player = new Player(e.pageX, e.pageY, 15); //Crea el jugador
+    this.failTimer = 0; //Reestablece el tiempo fallido
+    fail = false; //restablecer el estado del juego cuandpo se falla
+    starttime = new Date(); //Reinicio del reloj de espera
+    obstacles = []; //Borrar el array de obstáculos.
+  }
+});
+
+//Se ha utilizado el teorema de Pitágoras para determinar la distancia entre dos puntos. 
+//Que es la raíz cuadrada del producto a partir de dos distancias de valor absoluto al cuadrado.
+//Entonces obtengo el valor absoluto de la diferencia entre los valores (x), y luego otra vez con la (y)
+//Luego uso Math.pow para cuadrar los valores absolutos = A al cuadrado y B al cuadrado. Luego los multiplico juntos ... y por ultimo extiendo la raíz de todo, a través de Math.sqrt. - pura geometría básica de secundaria.
+function getDistance(x1, y1, x2, y2){
+  return Math.sqrt(Math.pow(Math.abs(x1-x2),2)+Math.pow(Math.abs(y1-y2),2));
+}
+
+//Uso del almacenamiento local para esconder algunos datos de puntuación
+function updateScore(score){
+  if(typeof(Storage) != undefined){
+    localStorage.setItem('HoldOnGame_JS13K',''+score);
+    best = localStorage.getItem('HoldOnGame_JS13K');
+  }
+}
+
+//Se establece la primera hora de inicio. 
+starttime = new Date();
+
+//comienza el juego (con un loop o bucle)
+animate();
+</script>
+</body>
+<!-- FIN DE LA PAGINA-->
+</html> 
