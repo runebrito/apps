@@ -4,7 +4,6 @@
 
 # Improvements for the Future
 
-- Input Validation 
-- User Authentication
-- Mysql BBDD 
+- Game in html5
+- Open in browser and play !
 - By RB
