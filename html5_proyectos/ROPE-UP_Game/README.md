@@ -2,7 +2,7 @@
 ![](Docs/screenshot1.png)
 ![](Docs/screenshot2.png)
 
-# Improvements for the Future
+# NOTES
 
 - Game in html5
 - Open in browser and play !
